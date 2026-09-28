@@ -1,0 +1,56 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find and extract project ZIP
+        run: |
+          ZIP=$(find . -maxdepth 1 -type f -name 'barbarg_robot_github*.zip' | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "Project ZIP not found"
+            exit 1
+          fi
+          mkdir -p /tmp/barbarg
+          unzip -q "$ZIP" -d /tmp/barbarg
+          echo "ZIP extracted:"
+          find /tmp/barbarg -maxdepth 3 -type f | head -50
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build APK
+        working-directory: /tmp/barbarg/barbarg_robot_github_ready
+        run: |
+          gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: barbarg-robot-apk
+          path: /tmp/barbarg/barbarg_robot_github_ready/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
